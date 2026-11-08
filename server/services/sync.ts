@@ -416,8 +416,28 @@ export async function runSync(mode: "incremental" | "full"): Promise<void> {
     const ctx: SyncContext = { mode, stopped: () => !syncing };
     await syncChannel(ctx);
     await syncLikedVideos(ctx);
-    await syncUserPlaylists(ctx);
-    await syncSubscriptions(ctx);
+
+    // Playlists and subscriptions are channel-scoped; some Google accounts
+    // have no YouTube channel at all (404 "Channel not found"). Those are
+    // legitimate "nothing to sync" outcomes, not failures.
+    const isNoChannel = (err: unknown): boolean =>
+      err instanceof YouTubeApiError && err.message.includes("Channel not found");
+
+    try {
+      await syncUserPlaylists(ctx);
+    } catch (err) {
+      if (!isNoChannel(err) || ctx.stopped()) throw err;
+      markStep("No YouTube channel on this account — skipping playlists");
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    try {
+      await syncSubscriptions(ctx);
+    } catch (err) {
+      if (!isNoChannel(err) || ctx.stopped()) throw err;
+      markStep("No YouTube channel on this account — skipping subscriptions");
+      await new Promise((r) => setTimeout(r, 0));
+    }
+
     markSyncFinished(null);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
