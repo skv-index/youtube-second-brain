@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html.light {
+    color-scheme: light;
+  }
+
+  body {
+    @apply bg-ink-950 text-paper-100 font-body antialiased;
+  }
+
+  html.light body {
+    @apply bg-paper-100 text-ink-900;
+  }
+
+  ::selection {
+    @apply bg-signal/30;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 155, 168, 0.35) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-ink-600/60;
+  }
+}
+
+@layer components {
+  .surface {
+    @apply border border-ink-700/70 bg-ink-900;
+  }
+  html.light .surface {
+    @apply border-paper-300/70 bg-white;
+  }
+  .surface-raise {
+    @apply border border-ink-700 bg-ink-800;
+  }
+  html.light .surface-raise {
+    @apply border-paper-300 bg-white;
+  }
+  .muted {
+    @apply text-[#9AA3B2];
+  }
+  html.light .muted {
+    @apply text-ink-600;
+  }
+  .focus-ring {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-signal/70 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950;
+  }
+  html.light .focus-ring {
+    @apply focus-visible:ring-offset-paper-100;
+  }
+}
+
+/* Reduced motion respected: drop entrance animations. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
