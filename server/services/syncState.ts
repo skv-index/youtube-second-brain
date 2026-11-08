@@ -41,7 +41,7 @@ export function getSyncStatus(): SyncProgress & { lastCompleted: PersistedSyncSt
   const db = getDb();
   const row = db.prepare("SELECT sync_token AS value FROM sync_state WHERE resource = ?").get(`__persist_${PERSISTED_KEY}`) as { value: string | null } | undefined;
   let lastCompleted: PersistedSyncState = { lastCompletedAt: null, lastError: null, lastMode: null };
-  if (row) {
+  if (row?.value) {
     try {
       lastCompleted = JSON.parse(row.value) as PersistedSyncState;
     } catch {
