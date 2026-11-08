@@ -54,6 +54,9 @@ router.get("/status", (req, res) => {
   });
 });
 
+// In dev, land back on the live Vite app rather than the static build on :3000.
+const frontendBase = process.env.NODE_ENV === "production" ? "" : "http://localhost:5173";
+
 // Kick off the OAuth flow. State doubles as CSRF protection (short-lived,
 // stored in memory, single use, verified on callback).
 const pendingStates = new Map<string, number>();
@@ -82,20 +85,25 @@ router.get("/google/callback", async (req: Request, res: Response) => {
   pendingStates.delete(state ?? "");
 
   if (!code || !issuedAt || Date.now() - issuedAt > 10 * 60 * 1000) {
-    res.redirect("/?authError=invalid_state");
+    res.redirect(`${frontendBase}/?authError=${encodeURIComponent("invalid_state")}`);
     return;
   }
 
   try {
     const tokens = await exchangeCodeForTokens(code);
+    if (!tokens.accessToken) {
+      console.error("[auth] token exchange returned no access token:", JSON.stringify(tokens));
+    }
     saveTokens(tokens);
     createSession(res);
+    console.log("[auth] token exchange OK; starting first full sync");
     // Populate the mirror immediately; the UI watches sync progress live.
     void runSync("full");
-    res.redirect("/?connected=1");
+    res.redirect(`${frontendBase}/?connected=1`);
   } catch (err) {
     const message = err instanceof Error ? err.message : "OAuth failed";
-    res.redirect(`/?authError=${encodeURIComponent(message.slice(0, 120))}`);
+    console.error("[auth] OAuth callback failed:", message);
+    res.redirect(`${frontendBase}/?authError=${encodeURIComponent(message.slice(0, 160))}`);
   }
 });
 

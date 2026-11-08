@@ -59,5 +59,5 @@ export function saveTokens(tokens: {
        expiry_at = excluded.expiry_at,
        scope = excluded.scope,
        needs_reauth = 0`
-  ).run(tokens.accessToken ?? existing?.accessToken ?? "", refreshToken, expiryAt, tokens.scope ?? existing?.scope ?? null, refreshToken);
+  ).run(tokens.accessToken ?? existing?.accessToken ?? "", refreshToken, expiryAt, tokens.scope ?? existing?.scope ?? null);
 }

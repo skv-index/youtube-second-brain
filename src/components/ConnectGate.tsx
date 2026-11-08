@@ -16,7 +16,17 @@ export default function ConnectGate({ children }: { children: React.ReactNode })
   const auth = useAuth();
   const invalidate = useInvalidateSync();
   const [starting, setStarting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => {
+    // Surface ?authError= from a failed OAuth callback on first render
+    // (before the auth provider scrubs the URL).
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const authError = params.get("authError");
+      if (authError) window.history.replaceState({}, "", window.location.pathname);
+      return authError ? decodeURIComponent(authError) : null;
+    }
+    return null;
+  });
 
   if (auth === null) {
     return (

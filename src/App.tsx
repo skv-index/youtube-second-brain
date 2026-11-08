@@ -24,6 +24,11 @@ const queryClient = new QueryClient({
   },
 });
 
+const routerFutureFlags = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+};
+
 function AppRoutes() {
   const auth = useAuth();
   return (
@@ -58,7 +63,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter>
+        <BrowserRouter future={routerFutureFlags}>
           <AppRoutes />
         </BrowserRouter>
       </AuthProvider>
