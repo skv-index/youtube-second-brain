@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Plus, Trash2, X } from "lucide-react";
 import { api, type CollectionSummary, type Video } from "@/api/client";
 import { VideoCard } from "@/components/VideoCard";
-import { VideoDetailModal } from "@/components/VideoDetailModal";
 import { EmptyState, ErrorState, Spinner, fmtDate } from "@/components/ui";
 
 interface MemberResponse {
@@ -14,7 +13,6 @@ export default function CollectionsPage() {
   const qc = useQueryClient();
   const [name, setName] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
-  const [active, setActive] = useState<Video | null>(null);
   const [creating, setCreating] = useState(false);
 
   const collections = useQuery({
@@ -166,7 +164,7 @@ export default function CollectionsPage() {
                     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                       {members.data!.items.map((v) => (
                         <div key={v.id} className="relative">
-                          <VideoCard video={v} onOpen={setActive} />
+                          <VideoCard video={v} />
                           <button
                             type="button"
                             onClick={() => removeFromCollection.mutate({ collectionId: c.id, videoId: v.id })}
@@ -185,90 +183,6 @@ export default function CollectionsPage() {
           ))}
         </div>
       )}
-
-      {active && openId !== null && (
-        <CollectionVideoModal video={active} collectionId={openId} onClose={() => setActive(null)} />
-      )}
-      {active && openId === null && <VideoDetailModal video={active} onClose={() => setActive(null)} />}
-    </div>
-  );
-}
-
-// When opened from inside a collection, adding/removing acts on that
-// collection only.
-function CollectionVideoModal({
-  video,
-  collectionId,
-  onClose,
-}: {
-  video: Video;
-  collectionId: number;
-  onClose: () => void;
-  onRemoved?: () => void;
-}) {
-  const qc = useQueryClient();
-  const collections = useQuery({
-    queryKey: ["collections"],
-    queryFn: () => api<{ items: CollectionSummary[] }>("/annotations/collections"),
-  });
-
-  const [members, setMembers] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    void api<{ items: { id: string }[] }>(`/annotations/collections/${collectionId}/videos`).then((res) => {
-      setMembers(new Set(res.items.map((v) => v.id)));
-    });
-  }, [collectionId]);
-
-  const toggle = useMutation({
-    mutationFn: (add: boolean) =>
-      api(`/annotations/collections/${collectionId}/videos/${video.id}`, { method: add ? "POST" : "DELETE" }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["collection-videos", collectionId] });
-      void qc.invalidateQueries({ queryKey: ["collections"] });
-      setMembers((prev) => {
-        const next = new Set(prev);
-        if (next.has(video.id)) next.delete(video.id);
-        else next.add(video.id);
-        return next;
-      });
-    },
-  });
-
-  const isMember = members.has(video.id);
-  const collectionName = collections.data?.items.find((c) => c.id === collectionId)?.name ?? "this collection";
-
-  return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-ink-950/80 p-6 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="surface-raise w-full max-w-md rounded-2xl p-6 text-center">
-        {video.thumbnail && (
-          <img src={video.thumbnail} alt="" className="mx-auto mb-4 aspect-video w-56 rounded-lg object-cover" />
-        )}
-        <p className="line-clamp-2 font-medium">{video.title}</p>
-        <p className="mt-1 text-sm muted">{isMember ? `Already in "${collectionName}"` : `Add to "${collectionName}"?`}</p>
-        <div className="mt-5 flex justify-center gap-2">
-          <button
-            type="button"
-            onClick={() => toggle.mutate(!isMember)}
-            className="focus-ring rounded-lg bg-signal px-4 py-2 text-sm font-semibold text-ink-950 hover:bg-signal-strong"
-          >
-            {toggle.isPending ? <Spinner className="border-ink-950 border-t-transparent" /> : isMember ? "Remove" : "Add"}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="focus-ring rounded-lg border border-ink-600 px-4 py-2 text-sm text-paper-200 hover:bg-ink-800"
-          >
-            Close
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

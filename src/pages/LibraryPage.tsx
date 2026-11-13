@@ -1,9 +1,8 @@
 import { useMemo, useState, useEffect } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Search, SlidersHorizontal } from "lucide-react";
-import { api, type TagInfo, type Video, type VideoPage } from "@/api/client";
+import { api, type TagInfo, type VideoPage } from "@/api/client";
 import { VideoCard } from "@/components/VideoCard";
-import { VideoDetailModal } from "@/components/VideoDetailModal";
 import { EmptyState, ErrorState, Skeleton, cn, fmtCount } from "@/components/ui";
 import { useAuth } from "@/auth/AuthProvider";
 
@@ -40,7 +39,6 @@ export default function LibraryPage() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
   const [debouncedQ, setDebouncedQ] = useState("");
-  const [active, setActive] = useState<Video | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
   // Read query params on mount (?channel= from dashboard links).
@@ -151,14 +149,12 @@ export default function LibraryPage() {
         <>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {videos.data!.items.map((v) => (
-              <VideoCard key={v.id} video={v} onOpen={setActive} />
+              <VideoCard key={v.id} video={v} />
             ))}
           </div>
           <Pager page={page} totalPages={totalPages} onChange={setPage} />
         </>
       )}
-
-      {active && <VideoDetailModal video={active} onClose={() => setActive(null)} />}
     </div>
   );
 }

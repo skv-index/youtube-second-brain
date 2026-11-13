@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { YsbDatabase, migrate } from "../server/db/index.js";
-import { parseIsoDuration, thumbnailUrl } from "../server/services/youtube.js";
+import { parseIsoDuration, thumbnailUrl, parseYouTubeErrorBody } from "../server/services/youtube.js";
 
 describe("database migration", () => {
   it("creates every table and upserts a video", () => {
@@ -50,5 +50,24 @@ describe("YouTube helpers", () => {
     assert.equal(thumbnailUrl({ default: { url: "d" } }), "d");
     assert.equal(thumbnailUrl(undefined), null);
     assert.equal(thumbnailUrl({}), null);
+  });
+});
+
+describe("YouTube error classification", () => {
+  it("extracts the reason from a Google API error body", () => {
+    const body = JSON.stringify({
+      error: {
+        code: 404,
+        message: "Channel not found.",
+        errors: [{ message: "Channel not found.", domain: "youtube", reason: "channelNotFound" }],
+      },
+    });
+    assert.equal(parseYouTubeErrorBody(body).reason, "channelNotFound");
+    assert.equal(parseYouTubeErrorBody(body).message, "Channel not found.");
+  });
+
+  it("returns empty details for non-JSON error bodies", () => {
+    assert.deepEqual(parseYouTubeErrorBody("<html>500</html>"), {});
+    assert.deepEqual(parseYouTubeErrorBody(""), {});
   });
 });

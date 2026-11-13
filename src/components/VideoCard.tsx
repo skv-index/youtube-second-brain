@@ -1,19 +1,28 @@
 import { memo } from "react";
+import { Link } from "react-router-dom";
 import { Bookmark, StickyNote, ThumbsUp } from "lucide-react";
 import type { Video } from "@/api/client";
 import { cn, fmtCount, fmtDate, fmtTimeAgo } from "./ui";
 
 export const VideoCard = memo(function VideoCard({
   video,
-  onOpen,
 }: {
   video: Video;
-  onOpen: (video: Video) => void;
 }) {
+  const tags: string[] = (() => {
+    if (Array.isArray(video.tags)) return video.tags;
+    if (typeof video.tags === "string") {
+      try {
+        return JSON.parse(video.tags);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  })();
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(video)}
+    <Link
+      to={`/videos/${video.id}`}
       className="focus-ring group flex w-full flex-col overflow-hidden rounded-xl border border-ink-700/60 bg-ink-900 text-left transition-colors hover:border-ink-600 hover:bg-ink-850"
     >
       <div className="relative aspect-video w-full overflow-hidden bg-ink-800">
@@ -59,11 +68,11 @@ export const VideoCard = memo(function VideoCard({
           )}
           {video.viewCount > 0 && <span>· {fmtCount(video.viewCount)} views</span>}
         </p>
-        {video.tags.length > 0 && (
-          <p className="truncate pt-1 text-[11px] text-signal/90"># {video.tags.join(" #")}</p>
+        {tags.length > 0 && (
+          <p className="truncate pt-1 text-[11px] text-signal/90"># {tags.join(" #")}</p>
         )}
       </div>
-    </button>
+    </Link>
   );
 });
 

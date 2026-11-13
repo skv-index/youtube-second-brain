@@ -34,10 +34,10 @@ router.get("/:id", (req: Request, res: Response) => {
   }
   const items = db
     .prepare(
-      `SELECT v.id, v.title, v.channel_title, v.thumbnail, v.duration_seconds, v.published_at, v.view_count,
-        pi.added_at, vi.position,
+      `SELECT v.id, v.title, v.channel_title AS channelTitle, v.thumbnail, v.duration_seconds AS durationSeconds, v.published_at AS publishedAt, v.view_count AS viewCount,
+        pi.added_at, pi.position,
         EXISTS (SELECT 1 FROM bookmarks b WHERE b.video_id = v.id) AS bookmarked,
-        (SELECT GROUP_CONCAT(t.name, ' ') FROM video_tags vt JOIN tags t ON t.id = vt.tag_id WHERE vt.video_id = v.id) AS tag_names
+        COALESCE((SELECT json_group_array(t.name) FROM video_tags vt JOIN tags t ON t.id = vt.tag_id WHERE vt.video_id = v.id), '[]') AS tags
        FROM playlist_items pi
        JOIN videos v ON v.id = pi.video_id
        JOIN playlists vi ON vi.id = pi.playlist_id

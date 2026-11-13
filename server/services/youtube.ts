@@ -212,10 +212,30 @@ type ApiErrorKind = "TOKEN" | "QUOTA" | "CONFIG" | "YOUTUBE";
 export class YouTubeApiError extends Error {
   constructor(
     message: string,
-    public readonly kind: ApiErrorKind
+    public readonly kind: ApiErrorKind,
+    /** Google `error.errors[0].reason`, when the response body provided one. */
+    public readonly reason?: string
   ) {
     super(message);
     this.name = "YouTubeApiError";
+  }
+}
+
+export interface YouTubeErrorBody {
+  reason?: string;
+  message?: string;
+}
+
+/** Pull Google's structured error reason/message out of a failed API response. */
+export function parseYouTubeErrorBody(body: string): YouTubeErrorBody {
+  try {
+    const json = JSON.parse(body) as {
+      error?: { message?: string; errors?: { reason?: string; message?: string }[] };
+    };
+    const first = json.error?.errors?.[0];
+    return { reason: first?.reason, message: first?.message ?? json.error?.message };
+  } catch {
+    return {};
   }
 }
 
@@ -282,7 +302,12 @@ export async function youtubeGet<T>(
       );
     }
     if (res.status === 404) {
-      throw new YouTubeApiError(`YouTube resource not found: ${resource}.`, "YOUTUBE");
+      const details = parseYouTubeErrorBody(body);
+      throw new YouTubeApiError(
+        `YouTube resource not found: ${resource}${details.message ? ` (${details.message})` : ""}.`,
+        "YOUTUBE",
+        details.reason
+      );
     }
     throw new YouTubeApiError(`YouTube API error ${res.status}: ${body.slice(0, 240)}`, "YOUTUBE");
   }

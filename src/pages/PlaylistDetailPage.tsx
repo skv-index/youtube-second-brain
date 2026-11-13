@@ -1,10 +1,8 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { api, type Video } from "@/api/client";
 import { VideoCard } from "@/components/VideoCard";
-import { VideoDetailModal } from "@/components/VideoDetailModal";
 import { EmptyState, ErrorState, Skeleton, fmtDate, fmtTimeAgo } from "@/components/ui";
 
 interface PlaylistDetailResponse {
@@ -14,7 +12,6 @@ interface PlaylistDetailResponse {
 
 export default function PlaylistDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [active, setActive] = useState<Video | null>(null);
   const detail = useQuery({
     queryKey: ["playlist", id],
     queryFn: () => api<PlaylistDetailResponse>(`/playlists/${id}`),
@@ -70,7 +67,7 @@ export default function PlaylistDetailPage() {
           ) : (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {items.map((v) => (
-                <VideoCard key={v.id} video={v} onOpen={setActive} />
+                <VideoCard key={v.id} video={v} />
               ))}
             </div>
           )}
@@ -79,8 +76,6 @@ export default function PlaylistDetailPage() {
           )}
         </>
       ) : null}
-
-      {active && <VideoDetailModal video={active} onClose={() => setActive(null)} />}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import {
   markSyncFinished,
   addItems,
   setSynced,
+  lastSyncedAt,
 } from "./syncState.js";
 
 const LIKED_PLAYLIST_ID = "LL";
@@ -388,6 +389,105 @@ async function syncSubscriptions(ctx: SyncContext): Promise<void> {
   if (!ctx.stopped()) setSynced("subscriptions", now());
 }
 
+/** Fetch playlists from all subscribed channels (for users without their own YouTube channel). */
+async function syncSubscribedChannelPlaylists(ctx: SyncContext): Promise<void> {
+  if (ctx.stopped()) return;
+  markStep("Subscribed channel playlists");
+  const db = getDb();
+
+  // Get all subscribed channel IDs from our mirror
+  const channelIds = db
+    .prepare("SELECT channel_id FROM subscriptions ORDER BY position")
+    .all() as { channel_id: string }[];
+
+  if (!channelIds.length) return;
+
+  markStep(`Fetching playlists from ${channelIds.length} subscribed channels`);
+
+  // Process in batches to respect quota
+  const BATCH_SIZE = 10; // 10 channels per batch
+  for (let batchStart = 0; batchStart < channelIds.length && !ctx.stopped(); batchStart += BATCH_SIZE) {
+    const batch = channelIds.slice(batchStart, batchStart + BATCH_SIZE);
+    const channelIdList = batch.map((c) => c.channel_id);
+
+    for (const channelId of channelIdList) {
+      if (ctx.stopped()) return;
+
+      // In incremental mode, only fetch if we haven't synced this channel's playlists recently
+      if (ctx.mode === "incremental") {
+        const lastSync = lastSyncedAt(`subscribed_playlists:${channelId}` as any);
+        if (lastSync && Date.now() - lastSync < 12 * 60 * 60 * 1000) {
+          continue; // Skip if synced within last 12 hours
+        }
+      }
+
+      markStep(`Playlists from ${channelId.slice(0, 20)}...`);
+
+      let pageToken: string | undefined;
+      let pages = 0;
+      const pageBudget = ctx.mode === "incremental" ? 1 : 5; // Only 1 page in incremental
+
+      while (!ctx.stopped() && pages < pageBudget) {
+        const data = await youtubeGet<{ items: YouTubePlaylist[]; nextPageToken?: string }>(
+          "playlists",
+          { part: "snippet,contentDetails,status", channelId, maxResults: PAGE_SIZE, pageToken },
+          1
+        );
+        pages += 1;
+        const playlists = data.items ?? [];
+
+        for (const pl of playlists) {
+          db.prepare(
+            `INSERT INTO playlists (id, title, description, thumbnail, channel_id, item_count, privacy, published_at, is_liked_mirror)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+             ON CONFLICT(id) DO UPDATE SET
+               title = excluded.title,
+               description = excluded.description,
+               thumbnail = excluded.thumbnail,
+               channel_id = excluded.channel_id,
+               item_count = excluded.item_count,
+               privacy = excluded.privacy,
+               published_at = excluded.published_at`
+          ).run(
+            pl.id,
+            pl.snippet.title,
+            pl.snippet.description,
+            thumbnailUrl(pl.snippet.thumbnails),
+            pl.snippet.channelId,
+            pl.contentDetails.itemCount,
+            pl.status.privacyStatus,
+            toMs(pl.snippet.publishedAt)
+          );
+          addItems(1);
+        }
+
+        // In incremental mode, skip playlists that are already fully in the mirror
+        const targets = ctx.mode === "incremental"
+          ? playlists.filter((pl) => knownItemCount(pl.id) < pl.contentDetails.itemCount)
+          : playlists;
+
+        for (const pl of targets) {
+          if (ctx.stopped()) return;
+          markStep(`Syncing playlist "${pl.snippet.title.slice(0, 32)}"`);
+          await syncPlaylistItems(pl.id, ctx);
+        }
+
+        pageToken = data.nextPageToken;
+        if (!pageToken) break;
+      }
+
+      // Mark this channel's playlists as synced
+      if (!ctx.stopped()) {
+        const db2 = getDb();
+        db2.prepare(
+          `INSERT INTO sync_state (resource, last_synced_at, sync_token, items_count) VALUES (?, ?, ?, 0)
+           ON CONFLICT(resource) DO UPDATE SET last_synced_at = excluded.last_synced_at, sync_token = excluded.sync_token`
+        ).run(`subscribed_playlists:${channelId}`, now(), null);
+      }
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Orchestrator
 // ---------------------------------------------------------------------------
@@ -421,7 +521,8 @@ export async function runSync(mode: "incremental" | "full"): Promise<void> {
     // have no YouTube channel at all (404 "Channel not found"). Those are
     // legitimate "nothing to sync" outcomes, not failures.
     const isNoChannel = (err: unknown): boolean =>
-      err instanceof YouTubeApiError && err.message.includes("Channel not found");
+      err instanceof YouTubeApiError &&
+      (err.reason === "channelNotFound" || err.message.includes("Channel not found"));
 
     try {
       await syncUserPlaylists(ctx);
@@ -435,6 +536,15 @@ export async function runSync(mode: "incremental" | "full"): Promise<void> {
     } catch (err) {
       if (!isNoChannel(err) || ctx.stopped()) throw err;
       markStep("No YouTube channel on this account — skipping subscriptions");
+      await new Promise((r) => setTimeout(r, 0));
+    }
+
+    // Sync playlists from subscribed channels (for users without their own channel)
+    try {
+      await syncSubscribedChannelPlaylists(ctx);
+    } catch (err) {
+      if (!isNoChannel(err) || ctx.stopped()) throw err;
+      markStep("No YouTube channel on this account — skipping subscribed channel playlists");
       await new Promise((r) => setTimeout(r, 0));
     }
 

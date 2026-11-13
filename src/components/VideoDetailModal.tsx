@@ -96,13 +96,24 @@ export function VideoDetailModal({ video, onClose }: Props) {
   });
 
   const d = detail.data;
-  const tags = d?.tags ?? video.tags;
+  const tags: string[] = (() => {
+    const raw = d?.tags ?? video.tags;
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  })();
   const bookmarked = d?.bookmarked ?? video.bookmarked;
   const noteBody = noteDraft ?? d?.note ?? "";
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink-950/80 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/80 p-2 sm:p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label={video.title}
@@ -110,7 +121,7 @@ export function VideoDetailModal({ video, onClose }: Props) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="surface-raise max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-t-2xl sm:rounded-2xl">
+      <div className="surface-raise max-h-[98dvh] w-full max-w-4xl overflow-y-auto rounded-2xl">
         <div className="relative aspect-video w-full bg-ink-950">
           {d?.thumbnail || video.thumbnail ? (
             <img src={d?.thumbnail ?? video.thumbnail ?? ""} alt="" className="h-full w-full object-cover" />

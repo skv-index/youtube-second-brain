@@ -10,6 +10,7 @@ import PlaylistDetailPage from "@/pages/PlaylistDetailPage";
 import SubscriptionsPage from "@/pages/SubscriptionsPage";
 import CollectionsPage from "@/pages/CollectionsPage";
 import SettingsPage from "@/pages/SettingsPage";
+import VideoDetailPage from "@/pages/VideoDetailPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,6 +52,7 @@ function AppRoutes() {
         <Route path="library" element={<LibraryPage />} />
         <Route path="playlists" element={<PlaylistsPage />} />
         <Route path="playlists/:id" element={<PlaylistDetailPage />} />
+        <Route path="videos/:id" element={<VideoDetailPage />} />
         <Route path="subscriptions" element={<SubscriptionsPage />} />
         <Route path="collections" element={<CollectionsPage />} />
         <Route path="settings" element={<SettingsPage />} />
